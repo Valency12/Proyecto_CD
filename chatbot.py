@@ -6,19 +6,28 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
-# Configurar la API key de Gemini
+# Configurar la API key
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+if not GOOGLE_API_KEY:
+    raise ValueError("No se encontró la API key de Google. Por favor, asegúrate de tener un archivo .env con GOOGLE_API_KEY")
+
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Cargar los datos
-df = pd.read_csv('students.csv')
+try:
+    df = pd.read_csv('students.csv')
+except FileNotFoundError:
+    raise FileNotFoundError("No se encontró el archivo students.csv")
 
 # Configurar el modelo
-modelo_gemini = genai.GenerativeModel('models/gemini-pro')
-
-# Solo para listar modelos (opcional, puedes comentar esto después de ver la lista)
-for m in genai.list_models():
-    print(m)
+try:
+    modelo_gemini = genai.GenerativeModel('models/gemini-1.5-pro')
+except Exception as e:
+    print(f"Error al inicializar el modelo: {str(e)}")
+    print("\nModelos disponibles:")
+    for m in genai.list_models():
+        print(m.name)
+    raise
 
 def get_context():
     """Genera un contexto con estadísticas básicas del dataset"""
@@ -108,8 +117,27 @@ def chat_with_gemini(user_input):
     if "creditos primer semestre" in pregunta:
         creditos = df['Curricular units 1st sem (credited)'].sum()
         return f"Se han otorgado {creditos} créditos en el primer semestre en total."
-    # Si no es una pregunta directa, responde con mensaje genérico
-    return "Lo siento, solo puedo responder preguntas simples sobre los datos. Reformula tu pregunta o consulta una estadística específica."
+    
+    # Si no es una pregunta directa, usar el modelo de IA
+    try:
+        prompt = f"""
+        Basado en los siguientes datos de estudiantes:
+        {df.to_string()}
+        
+        Responde a esta pregunta: {user_input}
+        
+        Por favor, proporciona una respuesta clara y concisa.
+        """
+        
+        response = modelo_gemini.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        # Manejo específico para error de cuota excedida
+        if hasattr(e, 'status_code') and e.status_code == 429:
+            return "Has alcanzado el límite de uso gratuito del modelo Gemini. Por favor, espera un tiempo o revisa tu cuota en Google Cloud."
+        if '429' in str(e) or 'quota' in str(e).lower():
+            return "Has alcanzado el límite de uso gratuito del modelo Gemini. Por favor, espera un tiempo o revisa tu cuota en Google Cloud."
+        return f"Lo siento, ocurrió un error al procesar tu pregunta: {str(e)}"
 
 def main():
     print("¡Bienvenido al Chatbot de Análisis de Estudiantes!")
