@@ -139,6 +139,7 @@ def chat_with_gemini(user_input):
             return "Has alcanzado el límite de uso gratuito del modelo Gemini. Por favor, espera un tiempo o revisa tu cuota en Google Cloud."
         return f"Lo siento, ocurrió un error al procesar tu pregunta: {str(e)}"
 
+#Main
 def main():
     print("¡Bienvenido al Chatbot de Análisis de Estudiantes!")
     print("Puedes hacer preguntas sobre los datos de estudiantes universitarios.")
